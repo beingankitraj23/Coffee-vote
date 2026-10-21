@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roast Ratings: vote and watch the leaderboard move</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #eef2ea;
+    --card: #fbfcf9;
+    --forest: #17352a;
+    --forest-2: #224a3b;
+    --ink: #0f1f18;
+    --muted: #5d6e64;
+    --line: #d3dccf;
+    --cherry: #c42b3c;
+    --star-off: #cdd7ca;
+    --star-on: #e0a21b;
+    --light: #cfa97d;
+    --medium: #8a5a36;
+    --dark: #3b2418;
+    --display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+    --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 16px/1.5 var(--body);
+  }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--cherry); outline-offset: 2px; }
+
+  header { max-width: 1240px; margin: 0 auto; padding: 40px 24px 8px; }
+  h1 {
+    font: 800 clamp(2.2rem, 5vw, 3.8rem)/1 var(--display);
+    letter-spacing: -0.02em; margin: 0 0 10px; max-width: 14ch;
+  }
+  header p { margin: 0; color: var(--muted); max-width: 52ch; }
+
+  .banner {
+    max-width: 1192px; margin: 16px auto 0; padding: 10px 16px;
+    background: #fff3d6; border: 1px solid #ecd28b; border-radius: 10px;
+    font-size: .92rem;
+  }
+  .banner[hidden] { display: none; }
+
+  .layout {
+    max-width: 1240px; margin: 0 auto; padding: 24px;
+    display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; align-items: start;
+  }
+
+  /* Toolbar */
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+  .toolbar input, .toolbar select {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 12px; min-height: 42px;
+  }
+  .toolbar input { flex: 1 1 200px; }
+  .count { margin: 0 0 14px; color: var(--muted); font-size: .92rem; }
+
+  /* Grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px 14px 14px 4px;
+    padding: 16px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .card h3 { font: 700 1.1rem/1.2 var(--display); margin: 0; }
+  .meta { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .9rem; flex-wrap: wrap; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+  .dot.Light { background: var(--light); }
+  .dot.Medium { background: var(--medium); }
+  .dot.Dark { background: var(--dark); }
+  .rankpill {
+    margin-left: auto; font: 700 .8rem var(--display); background: var(--paper);
+    border-radius: 999px; padding: 2px 9px; color: var(--forest);
+  }
+  .score { display: flex; align-items: baseline; gap: 8px; }
+  .score strong { font: 800 2.1rem/1 var(--display); letter-spacing: -0.02em; display: inline-block; }
+  .score span { color: var(--muted); font-size: .9rem; }
+  .bump { animation: bump .5s ease; }
+  @keyframes bump { 40% { transform: scale(1.18); color: var(--cherry); } }
+
+  .rate { margin-top: auto; border-top: 1px dashed var(--line); padding-top: 10px; }
+  .rate small { display: block; color: var(--muted); margin-bottom: 2px; }
+  .stars { display: inline-flex; flex-direction: row-reverse; }
+  .stars button {
+    background: none; border: 0; padding: 2px 3px; cursor: pointer;
+    font-size: 1.6rem; line-height: 1; color: var(--star-off);
+  }
+  .stars button:hover, .stars button:hover ~ button { color: var(--star-on); }
+  .stars button:disabled { cursor: wait; }
+  .done { color: var(--forest); font-weight: 600; }
+  .done .st { color: var(--star-on); letter-spacing: 2px; }
+
+  .empty { padding: 40px 0; color: var(--muted); }
+
+  /* Leaderboard */
+  aside {
+    position: sticky; top: 16px; background: var(--forest); color: #e8f0e6;
+    border-radius: 22px 22px 22px 6px; padding: 22px 20px 18px;
+  }
+  aside h2 { font: 800 1.5rem/1.1 var(--display); margin: 0 0 4px; }
+  aside .sub { margin: 0 0 16px; color: #9db5a0; font-size: .88rem; }
+  ol.board { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .row { display: grid; grid-template-columns: 30px 1fr auto; gap: 4px 10px; align-items: center; padding: 8px 10px; border-radius: 10px; }
+  .row.flash { animation: flash 1.2s ease; }
+  @keyframes flash { 0% { background: rgba(224, 162, 27, .35); } 100% { background: transparent; } }
+  .pos { font: 800 1.35rem var(--display); color: #9db5a0; }
+  .row:first-child .pos { color: var(--star-on); }
+  .nm { font-weight: 600; line-height: 1.2; }
+  .nm small { display: block; color: #9db5a0; font-weight: 400; }
+  .pts { font: 700 1.1rem var(--display); }
+  .bar { grid-column: 2 / 4; height: 5px; background: var(--forest-2); border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--cherry); border-radius: 3px; transition: width .6s ease; }
+  aside .note { margin: 14px 0 0; font-size: .8rem; color: #9db5a0; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 20px);
+    background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 12px;
+    opacity: 0; pointer-events: none; transition: .25s; max-width: 90vw; z-index: 10;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast.err { background: var(--cherry); }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { position: static; order: -1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Which roast deserves the top spot?</h1>
+  <p>Rate any roast from one to five stars. Your vote is saved to the database and the leaderboard re-ranks right away.</p>
+</header>
+<div class="banner" id="banner" hidden></div>
+
+<main class="layout">
+  <section aria-label="Coffee roasts">
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="Search roasts" aria-label="Search roasts">
+      <select id="origin" aria-label="Filter by origin"><option value="all">All origins</option></select>
+      <select id="roast" aria-label="Filter by roast level">
+        <option value="all">All roast levels</option>
+        <option>Light</option><option>Medium</option><option>Dark</option>
+      </select>
+      <select id="sort" aria-label="Sort roasts">
+        <option value="score">Top rated</option>
+        <option value="votes">Most votes</option>
+        <option value="rating">Highest average</option>
+        <option value="id">Original order</option>
+      </select>
+    </div>
+    <p class="count" id="count" aria-live="polite"></p>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <aside aria-label="Leaderboard">
+    <h2>Top 5 roasts</h2>
+    <p class="sub" id="boardSub">Loading…</p>
+    <ol class="board" id="board"></ol>
+    <p class="note">Ranked by a weighted score: roasts with only a few votes are pulled toward the overall average, so one lucky 5-star can't win.</p>
+  </aside>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  let coffees = [];
+  let meta = {};
+  let prevBoard = '';
+  let lastBumped = null;
+  let busy = false;
+  const f = { q: '', origin: 'all', roast: 'all', sort: 'score' };
+
+  // One vote per roast per browser (client-side only; see README).
+  let myVotes = {};
+  try { myVotes = JSON.parse(localStorage.getItem('myVotes') || '{}'); } catch {}
+  const saveVotes = () => { try { localStorage.setItem('myVotes', JSON.stringify(myVotes)); } catch {} };
+
+  function toast(msg, err) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (err ? ' err' : '');
+    clearTimeout(toast.t);
+    toast.t = setTimeout(() => { t.className = 'toast'; }, 2800);
+  }
+
+  function apply(data) {
+    coffees = data.coffees;
+    meta = data.meta;
+    const banner = $('#banner');
+    if (data.storage === 'memory') {
+      banner.hidden = false;
+      banner.textContent = 'Votes are stored in temporary memory, so they reset when the server restarts. Connect Upstash Redis in your Vercel project to keep them.';
+    } else banner.hidden = true;
+    fillOrigins();
+    renderGrid();
+    renderBoard();
+  }
+
+  function fillOrigins() {
+    const sel = $('#origin');
+    if (sel.options.length > 1) return;
+    [...new Set(coffees.map((c) => c.origin))].sort().forEach((o) => sel.add(new Option(o, o)));
+  }
+
+  function visible() {
+    const q = f.q.trim().toLowerCase();
+    const list = coffees.filter((c) =>
+      (f.origin === 'all' || c.origin === f.origin) &&
+      (f.roast === 'all' || c.roast === f.roast) &&
+      (!q || (c.name + ' ' + c.origin + ' ' + c.roast).toLowerCase().includes(q)));
+    const key = f.sort;
+    return list.sort((a, b) => key === 'id' ? a.id - b.id : b[key] - a[key] || b.votes - a.votes);
+  }
+
+  function renderGrid() {
+    const list = visible();
+    $('#count').textContent = `${list.length} of ${coffees.length} roasts · ${meta.totalVotes.toLocaleString()} votes cast`;
+    if (!list.length) { $('#grid').innerHTML = '<p class="empty">No roasts match those filters. Clear the search or pick another origin.</p>'; return; }
+    $('#grid').innerHTML = list.map((c) => {
+      const mine = myVotes[c.id];
+      const rate = mine
+        ? `<span class="done">You rated this <span class="st" aria-label="${mine} stars">${'★'.repeat(mine)}</span></span>`
+        : `<small>Rate this roast</small>
+           <div class="stars" role="group" aria-label="Rate ${esc(c.name)}">
+             ${[5, 4, 3, 2, 1].map((n) => `<button type="button" data-id="${c.id}" data-stars="${n}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join('')}
+           </div>`;
+      return `<article class="card">
+        <div>
+          <h3>${esc(c.name)}</h3>
+          <div class="meta"><span class="dot ${esc(c.roast)}"></span>${esc(c.roast)} roast, ${esc(c.origin)}<span class="rankpill">#${c.rank}</span></div>
+        </div>
+        <div class="score"><strong class="${lastBumped === c.id ? 'bump' : ''}">${c.rating.toFixed(1)}</strong><span>${c.votes.toLocaleString()} votes</span></div>
+        <div class="rate">${rate}</div>
+      </article>`;
+    }).join('');
+    lastBumped = null;
+  }
+
+  function renderBoard() {
+    const top = coffees.slice(0, 5);
+    const max = Math.max(...top.map((c) => c.score), 5);
+    $('#boardSub').textContent = `Average across all roasts: ${meta.mean.toFixed(2)}`;
+    const sig = top.map((c) => `${c.id}:${c.votes}`).join('|');
+    const changed = sig !== prevBoard;
+    $('#board').innerHTML = top.map((c, i) => `
+      <li class="row ${changed && prevBoard ? 'flash' : ''}">
+        <span class="pos">${i + 1}</span>
+        <span class="nm">${esc(c.name)}<small>${esc(c.roast)}, ${esc(c.origin)} · ${c.rating.toFixed(1)} avg · ${c.votes} votes</small></span>
+        <span class="pts">${c.score.toFixed(2)}</span>
+        <span class="bar"><i style="width:${(c.score / max * 100).toFixed(1)}%"></i></span>
+      </li>`).join('');
+    prevBoard = sig;
+  }
+
+  async function load() {
+    try {
+      const res = await fetch('/api/coffees', { cache: 'no-store' });
+      if (!res.ok) throw new Error();
+      apply(await res.json());
+    } catch {
+      if (!coffees.length) $('#grid').innerHTML = '<p class="empty">Could not load roasts. Check your connection and refresh.</p>';
+    }
+  }
+
+  async function vote(id, stars) {
+    if (busy) return;
+    busy = true;
+    document.querySelectorAll('.stars button').forEach((b) => { b.disabled = true; });
+    try {
+      const res = await fetch('/api/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, stars }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Vote failed');
+      myVotes[id] = stars;
+      saveVotes();
+      lastBumped = id;
+      apply(data);
+      toast(`Thanks! ${data.voted.name} now has ${data.voted.votes} votes and sits at #${data.voted.rank}.`);
+    } catch (e) {
+      toast(e.message || 'Could not save your vote. Try again.', true);
+      renderGrid();
+    } finally {
+      busy = false;
+    }
+  }
+
+  $('#grid').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-stars]');
+    if (b) vote(Number(b.dataset.id), Number(b.dataset.stars));
+  });
+  $('#q').addEventListener('input', (e) => { f.q = e.target.value; renderGrid(); });
+  ['origin', 'roast', 'sort'].forEach((k) => $('#' + k).addEventListener('change', (e) => { f[k] = e.target.value; renderGrid(); }));
+
+  load();
+  // Pick up other people's votes without a page refresh.
+  setInterval(() => { if (!document.hidden && !busy) load(); }, 8000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+})();
+</script>
+</body>
+</html>

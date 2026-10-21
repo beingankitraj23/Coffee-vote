@@ -1,0 +1,12 @@
+{
+  "name": "coffee-vote",
+  "version": "1.0.0",
+  "description": "Live coffee voting app: item grid, POST vote API, persistent counters, leaderboard",
+  "private": true,
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=18" },
+  "devDependencies": { "express": "^4.19.2" }
+}
