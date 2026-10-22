@@ -32,3 +32,5 @@ Without step 2 the app still runs, but votes live in memory and reset on cold st
 - Each roast stores `votes` and `sum of stars`; average = sum / votes.
 - Leaderboard score = `(v/(v+50))*avg + (50/(v+50))*overallMean`, so roasts with very few votes can't top the board.
 - "One vote per roast" is enforced in the browser (localStorage) only. For real protection add auth or IP rate limiting.
+
+Working link - https://coffee-vote-iota.vercel.app/
